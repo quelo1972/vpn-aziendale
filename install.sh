@@ -1,5 +1,18 @@
 #!/bin/bash
 
+# Verifica se openfortivpn è installato
+if ! command -v openfortivpn &> /dev/null
+then
+    echo "openfortivpn non trovato. Installazione in corso..."
+
+    sudo apt update
+    sudo apt install -y openfortivpn
+
+    echo "openfortivpn installato."
+else
+    echo "openfortivpn è già installato."
+fi
+
 CONFIG_DIR="$HOME/.config/openfortivpn"
 CONFIG_FILE="$CONFIG_DIR/config"
 

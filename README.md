@@ -1,31 +1,29 @@
 # VPN Aziendale
 
-Script Bash per gestire una VPN Fortinet tramite openfortivpn.
+Script Bash semplice e robusto per connettersi alla VPN aziendale tramite **openfortivpn** su sistemi Linux.
 
-## Installazione
+Progettato per ambienti **Kubuntu / Ubuntu**, consente di:
 
-Clonare il repository:
+- avviare la VPN
+- disconnettere la VPN
+- verificare lo stato della connessione
 
-git clone https://github.com/quelo1972/vpn-aziendale.git
+Lo script gestisce automaticamente:
 
-Entrare nella directory:
+- autenticazione
+- log della connessione
+- notifiche desktop
+- gestione del processo VPN
 
-cd vpn-aziendale
+---
 
-Eseguire lo script di installazione:
+# Requisiti
 
-./install.sh
+- Linux (testato su Kubuntu)
+- sudo
+- openfortivpn
 
-## Utilizzo
+Installazione dipendenze:
 
-Avviare la VPN:
-
-./vpn-aziendale.sh start
-
-Disconnettere la VPN:
-
-./vpn-aziendale.sh stop
-
-Verificare lo stato:
-
-./vpn-aziendale.sh status
+```bash
+sudo apt install openfortivpn
