@@ -26,4 +26,4 @@ Lo script gestisce automaticamente:
 Installazione dipendenze:
 
 ```bash
-sudo apt install openfortivpn
+Da ora è automatizzato nello script install.sh
