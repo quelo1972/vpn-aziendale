@@ -26,4 +26,4 @@ Lo script gestisce automaticamente:
 Installazione dipendenze:
 
 ```bash
-Da ora è automatizzato nello script install.sh
+Da ora è automatizzata nello script install.sh
