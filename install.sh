@@ -49,21 +49,51 @@ read -s -p "Password VPN: " VPN_PASS
 echo
 echo
 
-echo "Recupero fingerprint reale dal gateway..."
-echo "Potrebbe chiedere la password sudo."
 echo
+echo "Recupero fingerprint del certificato VPN..."
 
-# LANCIO COME ROOT SENZA PASSWORD VPN
-TMP_OUTPUT=$(echo "" | sudo timeout 8 openfortivpn ${VPN_HOST}:${VPN_PORT} \
-    --username=${VPN_USER} 2>&1)
+# esegue openfortivpn e salva output
+vpn_output=$(openfortivpn "$VPN_HOST:$VPN_PORT" -u "$VPN_USER" -p "$VPN_PASS" 2>&1)
 
-# Estrazione robusta del fingerprint (prima stringa hex di 64 caratteri)
-VPN_CERT=$(echo "$TMP_OUTPUT" | grep -oE '[a-f0-9]{64}' | head -n1)
+# controlla se il comando è fallito
+if [ $? -ne 0 ]; then
+    echo "Errore durante il tentativo di connessione alla VPN."
+    echo
+    echo "Output:"
+    echo "$vpn_output"
+    echo
+    echo "Controllare host, porta, username e password."
+    exit 1
+fi
+
+# estrai fingerprint
+fingerprint=$(echo "$vpn_output" | grep -i "fingerprint" | awk '{print $NF}')
+
+# controlla se vuoto
+if [ -z "$fingerprint" ]; then
+    echo
+    echo "Errore: nessun fingerprint restituito dal server VPN."
+    echo
+    echo "Possibili cause:"
+    echo "- host VPN errato"
+    echo "- porta errata"
+    echo "- server non raggiungibile"
+    echo "- autenticazione fallita"
+    echo
+    exit 1
+fi
+
+# verifica formato SHA256 (64 hex)
+if ! [[ "$fingerprint" =~ ^[a-fA-F0-9]{64}$ ]]; then
+    echo
+    echo "Fingerprint ricevuto non valido:"
+    echo "$fingerprint"
+    exit 1
+fi
 
 echo
-echo "Fingerprint rilevato dal client:"
-echo "$VPN_CERT"
-echo
+echo "Fingerprint rilevato:"
+echo "$fingerprint"
 
 read -p "Confermi di volerlo usare? (S/n): " CONFIRM
 if [[ "$CONFIRM" == "n" || "$CONFIRM" == "N" ]]; then
