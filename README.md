@@ -8,6 +8,8 @@ Il progetto automatizza:
 * configurazione della VPN
 * recupero automatico del fingerprint del certificato
 * gestione della connessione VPN
+* assegnazione permessi ristretti (700) alla directory ~/.config/openfortivpn/
+* assegnazione permessi ristretti (600) alla directory ~/.config/openfortivpn/config
 
 Testato su **Ubuntu / Kubuntu**.
 
@@ -25,7 +27,7 @@ Dipendenza principale:
 
 * `openfortivpn`
 
-Il client openfortivpn crea un tunnel PPP e gestisce la comunicazione con il gateway SSL/VPN Fortinet. ([GitHub][1])
+Il client openfortivpn crea un tunnel PPP e gestisce la comunicazione SSL/VPN con il gateway Fortinet. ([GitHub][1])
 
 ---
 
@@ -39,12 +41,13 @@ cd vpn-aziendale
 ```
 
 Passare al ramo desiderato (opzionale):
+default master
 
 ```bash
-git checkout master
+git switch master
 ```
 ```bash
-git checkout dev
+git switch dev
 ```
 
 Rendere eseguibile lo script di installazione (ma dovrebbe già esserlo):
@@ -80,8 +83,9 @@ Durante l'installazione verranno richiesti:
 
 * host VPN
 * porta VPN
-* username
-* password
+* username VPN
+* password VPN
+* DNS ASIENDALI (separati da spazio)
 
 ---
 
@@ -92,6 +96,7 @@ Per connettersi alla VPN:
 ```bash
 ./vpn-aziendale.sh start
 ```
+lo script restituisce il log completo resituito dal comando openfortivpn comprese informazioni sull'interfaccia ppp0 e i server dns aggiunti dopo che il tunnel viene stabilito
 
 Per disconnettersi:
 

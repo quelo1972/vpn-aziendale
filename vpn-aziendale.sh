@@ -9,6 +9,17 @@ CONFIG="$CONFIG_BASEDIR/config"
 PID_FILE="$CONFIG_BASEDIR/vpn.pid"
 LOG_UP="$CONFIG_BASEDIR/vpn-up.log"
 MAX_WAIT=15   # secondi massimi di attesa connessione
+DNS_FILE="$CONFIG_BASEDIR/dnsservers"
+DNS_FILE_DOMAIN="$CONFIG_BASEDIR/dnsdomain"
+
+#if [ -f "$DNS_FILE" ]; then
+#    DNS_SERVERS=$(cat "$DNS_FILE")
+#    echo "Imposto DNS VPN: $DNS_SERVERS"
+#    DNS_DOMAIN=$(cat "$DNS_FILE_DOMAIN")
+#    echo "Imposto DomainDNS VPN: $DNS_DOMAIN"
+#else
+#    echo "Nessun file DNS trovato ($DNS_FILE)"
+#fi
 
 # ---------- Funzioni ----------
 
@@ -17,6 +28,15 @@ vpn_is_up() {
 }
 
 start_vpn() {
+    if [ -f "$DNS_FILE" ]; then
+        DNS_SERVERS=$(cat "$DNS_FILE")
+        echo "Imposto DNS VPN: $DNS_SERVERS"
+        DNS_DOMAIN=$(cat "$DNS_FILE_DOMAIN")
+        echo "Imposto DomainDNS VPN: $DNS_DOMAIN"
+    else
+        echo "Nessun file DNS trovato ($DNS_FILE)"
+    fi
+
     if vpn_is_up; then
         echo "VPN già attiva."
         return
@@ -30,13 +50,14 @@ start_vpn() {
     echo "Avvio VPN..."
     nohup sudo openfortivpn --config "$CONFIG" > "$LOG_UP" 2>&1 &
     VPN_PID=$!
+    sleep 3 # attendo 3 secondi per permettere a tutti i log di raggiungere $LOG_UP
     echo "Connessione in corso..."
     for ((i=1;i<=MAX_WAIT;i++)); do
         if vpn_is_up; then
             echo "$VPN_PID" > "$PID_FILE"
             # imposto dns resolver e dafault domain aziendali
-            sudo resolvectl dns ppp0 192.168.23.11 192.168.23.12
-            sudo resolvectl domain ppp0 comune.spoleto.local
+            sudo resolvectl dns ppp0 $DNS_SERVERS
+            sudo resolvectl domain ppp0 $DNS_DOMAIN
             ip address show ppp0 >> $LOG_UP
             #resolvectl status | awk '/Link .* \(ppp0\)/,/^$/'
             echo "DNS $(resolvectl dns ppp0)" >> $LOG_UP
@@ -75,6 +96,9 @@ stop_vpn() {
 status_vpn() {
     if vpn_is_up; then
         echo "VPN attiva."
+        echo "------ Contenuto vpn-up.log ------"
+        cat "$LOG_UP"
+        echo "---------------------------------"
     else
         echo "VPN non attiva."
     fi

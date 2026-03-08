@@ -13,14 +13,16 @@ else
     echo "openfortivpn è già installato."
 fi
 
-CONFIG_DIR="$HOME/.config/openfortivpn"
-CONFIG_FILE="$CONFIG_DIR/config"
+CONFIG_BASEDIR="$HOME/.config/openfortivpn"
+CONFIG_FILE="$CONFIG_BASEDIR/config"
+DNS_FILE="$CONFIG_BASEDIR/dnsservers"
+DNS_FILE_DOMAIN="$CONFIG_BASEDIR/dnsdomain"
 
 # Crea directory
-if [ ! -d "$CONFIG_DIR" ]; then
-    mkdir -p "$CONFIG_DIR"
-    chmod 700 "$CONFIG_DIR"
-    echo "Creata directory $CONFIG_DIR"
+if [ ! -d "$CONFIG_BASEDIR" ]; then
+    mkdir -p "$CONFIG_BASEDIR"
+    chmod 700 "$CONFIG_BASEDIR"
+    echo "Creata directory $CONFIG_BASEDIR"
 fi
 
 # Sovrascrittura
@@ -36,6 +38,8 @@ fi
 read -p "Host VPN: " VPN_HOST
 read -p "Porta VPN [443]: " VPN_PORT
 VPN_PORT=${VPN_PORT:-443}
+read -p "Lista DNS aziendali (separati da spazio): " VPN_DNS
+read -p "Default domain: " VPN_DOMAIN
 read -p "Username VPN: " VPN_USER
 read -s -p "Password VPN: " VPN_PASS
 echo
@@ -110,8 +114,17 @@ trusted-cert = $FINGERPRINT
 set-dns = 0
 EOF
 
+# Scrittura DNS file
+echo "$VPN_DNS" > "$DNS_FILE"
+echo "$VPN_DOMAIN" > "$DNS_FILE_DOMAIN"
+
+# Assegnazione permessi ristretti ai files di configurazione
 chmod 600 "$CONFIG_FILE"
+chmod 600 "$DNS_FILE"
+chmod 600 "$DNS_FILE_DOMAIN"
 
 echo
 echo "Configurazione salvata in $CONFIG_FILE"
+echo "DNS aziendali salvati in $DNS_FILE"
+echo "Default domain salvato in $DNS_FILE_DOMAIN"
 echo "Installazione completata con successo."
