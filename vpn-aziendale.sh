@@ -61,6 +61,7 @@ start_vpn() {
             ip address show ppp0 >> $LOG_UP
             #resolvectl status | awk '/Link .* \(ppp0\)/,/^$/'
             echo "DNS $(resolvectl dns ppp0)" >> $LOG_UP
+            echo "Default domain: $DNS_DOMAIN" >> $LOG_UP
             notify-send "VPN" "Connessa"
             echo "VPN connessa (PID $VPN_PID)"
             echo "------ Contenuto vpn-up.log ------"
