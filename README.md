@@ -1,6 +1,6 @@
 # VPN Aziendale
 
-Script Bash semplice e robusto per connettersi alla VPN aziendale tramite **openfortivpn** su sistemi Linux.
+Script Bash semplice e robusto per connettersi alla SSL/VPN aziendale (FORTINET) tramite **openfortivpn** su sistemi Linux.
 
 Progettato per ambienti **Kubuntu / Ubuntu**, consente di:
 
