@@ -1,28 +1,212 @@
-# VPN Aziendale
+# vpn-aziendale
 
-Script Bash semplice e robusto per connettersi alla SSL/VPN aziendale (FORTINET) tramite **openfortivpn** su sistemi Linux.
+Script Bash per connettersi facilmente alla VPN aziendale tramite **openfortivpn** su sistemi Linux.
 
-Progettato per ambienti **Kubuntu / Ubuntu**, consente di:
+Il progetto automatizza:
 
-- avviare la VPN
-- disconnettere la VPN
-- verificare lo stato della connessione
+* installazione delle dipendenze
+* configurazione della VPN
+* recupero automatico del fingerprint del certificato
+* gestione della connessione VPN
 
-Lo script gestisce automaticamente:
-
-- autenticazione
-- log della connessione
-- notifiche desktop
-- gestione del processo VPN
+Testato su **Ubuntu / Kubuntu**.
 
 ---
 
 # Requisiti
 
-- Linux (testato su Kubuntu)
-- sudo
-- openfortivpn
+Sistema operativo supportato:
 
-Installazione dipendenze:
+* Ubuntu
+* Kubuntu
+* Debian-based Linux
 
-da ora è automatizzata nello script install.sh
+Dipendenza principale:
+
+* `openfortivpn`
+
+Il client openfortivpn crea un tunnel PPP e gestisce la comunicazione con il gateway VPN Fortinet. ([GitHub][1])
+
+---
+
+# Installazione
+
+Clonare il repository:
+
+```bash
+git clone https://github.com/quelo1972/vpn-aziendale.git
+cd vpn-aziendale
+```
+
+Passare al ramo desiderato (opzionale):
+
+```bash
+git checkout dev
+```
+
+Rendere eseguibile lo script di installazione:
+
+```bash
+chmod +x install.sh
+```
+
+Eseguire l'installazione:
+
+```bash
+./install.sh
+```
+
+Lo script eseguirà automaticamente:
+
+* installazione di `openfortivpn` (se non presente)
+* creazione directory configurazione
+
+```
+~/.config/openfortivpn
+```
+
+* creazione file di configurazione
+
+```
+~/.config/openfortivpn/config
+```
+
+* recupero automatico del fingerprint del certificato VPN
+
+Durante l'installazione verranno richiesti:
+
+* host VPN
+* porta VPN
+* username
+* password
+
+---
+
+# Utilizzo
+
+Per connettersi alla VPN:
+
+```bash
+./vpn-aziendale.sh start
+```
+
+Per disconnettersi:
+
+```bash
+./vpn-aziendale.sh stop
+```
+
+Per verificare lo stato della connessione:
+
+```bash
+./vpn-aziendale.sh status
+```
+
+---
+
+# Verifica della connessione
+
+Quando la VPN è attiva dovrebbe comparire l'interfaccia:
+
+```
+ppp0
+```
+
+Verifica:
+
+```bash
+ip address show ppp0
+```
+
+Controllo DNS assegnato dalla VPN:
+
+```bash
+resolvectl dns ppp0
+```
+
+---
+
+# Struttura del progetto
+
+```
+vpn-aziendale
+│
+├── install.sh
+├── vpn-aziendale.sh
+└── README.md
+```
+
+### install.sh
+
+Script di installazione che:
+
+* installa `openfortivpn`
+* crea la configurazione
+* recupera il fingerprint del certificato
+* salva il file config
+
+### vpn-aziendale.sh
+
+Script principale per la gestione della VPN:
+
+* avvio della connessione
+* disconnessione
+* verifica stato VPN
+
+---
+
+# Troubleshooting
+
+### openfortivpn non installato
+
+Installarlo manualmente:
+
+```bash
+sudo apt update
+sudo apt install openfortivpn
+```
+
+---
+
+### la VPN non si connette
+
+Controllare:
+
+* host VPN
+* porta VPN
+* username/password
+* fingerprint certificato
+
+---
+
+### interfaccia ppp0 non presente
+
+Controllare lo stato della connessione:
+
+```bash
+ip link show
+```
+
+---
+
+# Sicurezza
+
+Il file di configurazione contiene le credenziali e viene creato con permessi restrittivi:
+
+```
+chmod 600 ~/.config/openfortivpn/config
+```
+
+---
+
+# Licenza
+
+Questo progetto è distribuito sotto licenza MIT.
+
+---
+
+# Autore
+
+Andrea Ros
+
+[1]: https://github.com/adrienverge/openfortivpn?utm_source=chatgpt.com "GitHub - adrienverge/openfortivpn: Client for PPP+TLS VPN tunnel services"
