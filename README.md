@@ -204,10 +204,12 @@ ip link show
 
 # Sicurezza
 
-Il file di configurazione contiene le credenziali e viene creato con permessi restrittivi:
+I files di configurazione contiengono le credenziali, dns servers, default domain e vengono creati con permessi restrittivi:
 
 ```
 chmod 600 ~/.config/openfortivpn/config
+chmod 600 ~/.config/openfortivpn/dnsservers
+chmod 600 ~/.config/openfortivpn/dnsdomain
 ```
 
 ---
