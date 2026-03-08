@@ -25,7 +25,7 @@ Dipendenza principale:
 
 * `openfortivpn`
 
-Il client openfortivpn crea un tunnel PPP e gestisce la comunicazione con il gateway VPN Fortinet. ([GitHub][1])
+Il client openfortivpn crea un tunnel PPP e gestisce la comunicazione con il gateway SSL/VPN Fortinet. ([GitHub][1])
 
 ---
 

@@ -16,13 +16,6 @@ fi
 CONFIG_DIR="$HOME/.config/openfortivpn"
 CONFIG_FILE="$CONFIG_DIR/config"
 
-echo "=== Installazione configurazione openfortivpn ==="
-
-if ! command -v openfortivpn >/dev/null 2>&1; then
-    echo "Errore: openfortivpn non è installato."
-    exit 1
-fi
-
 # Crea directory
 if [ ! -d "$CONFIG_DIR" ]; then
     mkdir -p "$CONFIG_DIR"
