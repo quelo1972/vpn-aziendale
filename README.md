@@ -101,7 +101,7 @@ Per connettersi alla VPN:
 ```bash
 ./vpn-aziendale.sh start
 ```
-lo script restituisce il log completo resituito dal comando openfortivpn comprese informazioni sull'interfaccia ppp0 e i server dns aggiunti dopo che il tunnel viene stabilito
+lo script restituisce il log completo resituito dal comando openfortivpn comprese informazioni sull'interfaccia ppp0 e i server dns e il default domain aggiunti dopo che il tunnel viene stabilito
 
 Per disconnettersi:
 
