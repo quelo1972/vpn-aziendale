@@ -42,6 +42,8 @@ Passare al ramo desiderato (opzionale):
 
 ```bash
 git checkout master
+```
+```bash
 git checkout dev
 ```
 
