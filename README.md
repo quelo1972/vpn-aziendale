@@ -216,12 +216,12 @@ chmod 600 ~/.config/openfortivpn/dnsdomain
 
 # Licenza
 
-Questo progetto è distribuito sotto licenza MIT.
+Questo progetto è distribuito sotto licenza open source.
 
 ---
 
 # Autore
 
-Andrea Ros
+Andrea Rossetti
 
 [1]: https://github.com/adrienverge/openfortivpn?utm_source=chatgpt.com "GitHub - adrienverge/openfortivpn: Client for PPP+TLS VPN tunnel services"
