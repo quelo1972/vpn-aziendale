@@ -1,5 +1,5 @@
 #!/bin/bash
-
+sudo -v
 # Verifica se openfortivpn è installato
 if ! command -v openfortivpn &> /dev/null
 then
