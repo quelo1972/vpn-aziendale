@@ -59,7 +59,6 @@ start_vpn() {
             sudo resolvectl dns ppp0 $DNS_SERVERS
             sudo resolvectl domain ppp0 $DNS_DOMAIN
             ip address show ppp0 >> $LOG_UP
-            #resolvectl status | awk '/Link .* \(ppp0\)/,/^$/'
             echo "DNS $(resolvectl dns ppp0)" >> $LOG_UP
             echo "Default domain: $DNS_DOMAIN" >> $LOG_UP
             notify-send "VPN" "Connessa"
