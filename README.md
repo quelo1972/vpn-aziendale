@@ -41,10 +41,11 @@ cd vpn-aziendale
 Passare al ramo desiderato (opzionale):
 
 ```bash
+git checkout master
 git checkout dev
 ```
 
-Rendere eseguibile lo script di installazione:
+Rendere eseguibile lo script di installazione (ma dovrebbe già esserlo):
 
 ```bash
 chmod +x install.sh
