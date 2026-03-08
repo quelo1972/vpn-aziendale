@@ -17,7 +17,6 @@ CONFIG_DIR="$HOME/.config/openfortivpn"
 CONFIG_FILE="$CONFIG_DIR/config"
 
 echo "=== Installazione configurazione openfortivpn ==="
-echo
 
 if ! command -v openfortivpn >/dev/null 2>&1; then
     echo "Errore: openfortivpn non è installato."
@@ -47,23 +46,60 @@ VPN_PORT=${VPN_PORT:-443}
 read -p "Username VPN: " VPN_USER
 read -s -p "Password VPN: " VPN_PASS
 echo
-echo
 
-echo "Recupero fingerprint reale dal gateway..."
-echo "Potrebbe chiedere la password sudo."
-echo
+echo "Recupero fingerprint del certificato VPN..."
+echo "potrebbe essere richiesto l'inserimento della password sudo"
 
 # LANCIO COME ROOT SENZA PASSWORD VPN
 TMP_OUTPUT=$(echo "" | sudo timeout 8 openfortivpn ${VPN_HOST}:${VPN_PORT} \
     --username=${VPN_USER} 2>&1)
 
-# Estrazione robusta del fingerprint (prima stringa hex di 64 caratteri)
-VPN_CERT=$(echo "$TMP_OUTPUT" | grep -oE '[a-f0-9]{64}' | head -n1)
+FINGERPRINT=$(echo "$TMP_OUTPUT" | grep -oE '[a-f0-9]{64}' | head -n1)
+
+# verifica se fingerprint trovato
+if [ -z "$FINGERPRINT" ]; then
+    echo
+    echo "Errore: impossibile recuperare il fingerprint dal server VPN."
+    echo
+    echo "Output restituito da openfortivpn:"
+    echo "--------------------------------"
+    echo "$vpn_output"
+    echo "--------------------------------"
+    echo
+    echo "Controllare:"
+    echo "- host VPN"
+    echo "- porta"
+    echo "- username/password"
+    echo "- raggiungibilità del server"
+    echo
+    exit 1
+fi
+
+# controlla se vuoto
+if [ -z "$FINGERPRINT" ]; then
+    echo
+    echo "Errore: nessun fingerprint restituito dal server VPN."
+    echo
+    echo "Possibili cause:"
+    echo "- host VPN errato"
+    echo "- porta errata"
+    echo "- server non raggiungibile"
+    echo "- autenticazione fallita"
+    echo
+    exit 1
+fi
+
+# verifica formato SHA256 (64 hex)
+if ! [[ "$FINGERPRINT" =~ ^[a-fA-F0-9]{64}$ ]]; then
+    echo
+    echo "Fingerprint ricevuto non valido:"
+    echo "$FINGERPRINT"
+    exit 1
+fi
 
 echo
-echo "Fingerprint rilevato dal client:"
-echo "$VPN_CERT"
-echo
+echo "Fingerprint rilevato:"
+echo "$FINGERPRINT"
 
 read -p "Confermi di volerlo usare? (S/n): " CONFIRM
 if [[ "$CONFIRM" == "n" || "$CONFIRM" == "N" ]]; then
@@ -77,7 +113,7 @@ host = $VPN_HOST
 port = $VPN_PORT
 username = $VPN_USER
 password = $VPN_PASS
-trusted-cert = $VPN_CERT
+trusted-cert = $FINGERPRINT
 set-dns = 0
 EOF
 

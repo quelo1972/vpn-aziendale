@@ -41,6 +41,12 @@ start_vpn() {
 
         if vpn_is_up; then
             echo "$VPN_PID" > "$PID_FILE"
+            # imposto dns resolver e dafault domain aziendali
+            sudo resolvectl dns ppp0 192.168.23.11 192.168.23.12
+            sudo resolvectl domain ppp0 comune.spoleto.local
+            ip address show ppp0 >> $LOG_UP
+            #resolvectl status | awk '/Link .* \(ppp0\)/,/^$/'
+            echo "DNS $(resolvectl dns ppp0)" >> $LOG_UP
 
             notify-send "VPN" "Connessa"
 
@@ -48,11 +54,6 @@ start_vpn() {
             echo "------ Contenuto vpn-up.log ------"
             cat "$LOG_UP"
             echo "---------------------------------"
-
-            # imposto dns resolver e dafault domain aziendali
-            sudo resolvectl dns ppp0 192.168.23.11 192.168.23.12
-            sudo resolvectl domain ppp0 comune.spoleto.local
-
             return
         fi
 
