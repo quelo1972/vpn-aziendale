@@ -16,7 +16,7 @@ fi
 CONFIG_BASEDIR="$HOME/.config/openfortivpn"
 CONFIG_FILE="$CONFIG_BASEDIR/config"
 DNS_FILE="$CONFIG_BASEDIR/dnsservers"
-DNS_FILE_DOMAIN="$CONFIG_BASEDIR/dnsdomain"
+DNS_DOMAIN_FILE="$CONFIG_BASEDIR/dnsdomain"
 
 # Crea directory
 if [ ! -d "$CONFIG_BASEDIR" ]; then
@@ -116,15 +116,15 @@ EOF
 
 # Scrittura DNS file
 echo "$VPN_DNS" > "$DNS_FILE"
-echo "$VPN_DOMAIN" > "$DNS_FILE_DOMAIN"
+echo "$VPN_DOMAIN" > "$DNS_DOMAIN_FILE"
 
 # Assegnazione permessi ristretti ai files di configurazione
 chmod 600 "$CONFIG_FILE"
 chmod 600 "$DNS_FILE"
-chmod 600 "$DNS_FILE_DOMAIN"
+chmod 600 "$DNS_DOMAIN_FILE"
 
 echo
 echo "Configurazione salvata in $CONFIG_FILE"
 echo "DNS aziendali salvati in $DNS_FILE"
-echo "Default domain salvato in $DNS_FILE_DOMAIN"
+echo "Default domain salvato in $DNS_DOMAIN_FILE"
 echo "Installazione completata con successo."

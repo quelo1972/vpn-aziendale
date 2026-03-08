@@ -10,12 +10,12 @@ PID_FILE="$CONFIG_BASEDIR/vpn.pid"
 LOG_UP="$CONFIG_BASEDIR/vpn-up.log"
 MAX_WAIT=15   # secondi massimi di attesa connessione
 DNS_FILE="$CONFIG_BASEDIR/dnsservers"
-DNS_FILE_DOMAIN="$CONFIG_BASEDIR/dnsdomain"
+DNS_DOMAIN_FILE="$CONFIG_BASEDIR/dnsdomain"
 
 #if [ -f "$DNS_FILE" ]; then
 #    DNS_SERVERS=$(cat "$DNS_FILE")
 #    echo "Imposto DNS VPN: $DNS_SERVERS"
-#    DNS_DOMAIN=$(cat "$DNS_FILE_DOMAIN")
+#    DNS_DOMAIN=$(cat "$DNS_DOMAIN_FILE")
 #    echo "Imposto DomainDNS VPN: $DNS_DOMAIN"
 #else
 #    echo "Nessun file DNS trovato ($DNS_FILE)"
@@ -31,10 +31,17 @@ start_vpn() {
     if [ -f "$DNS_FILE" ]; then
         DNS_SERVERS=$(cat "$DNS_FILE")
         echo "Imposto DNS VPN: $DNS_SERVERS"
-        DNS_DOMAIN=$(cat "$DNS_FILE_DOMAIN")
-        echo "Imposto DomainDNS VPN: $DNS_DOMAIN"
     else
         echo "Nessun file DNS trovato ($DNS_FILE)"
+        echo "Riesegui install.sh o edita a mano $DNS_FILE"
+    fi
+
+    if [ -f "$DNS_DOMAIN_FILE" ]; then
+        DNS_DOMAIN=$(cat "$DNS_DOMAIN_FILE")
+        echo "Imposto Default domain VPN: $DNS_DOMAIN_FILE"
+    else
+        echo "Nessun file Default domain trovato ($DNS_DOMAIN)"
+        echo "Riesegui install.sh o edita a mano $DNS_DOMAIN_FILE"
     fi
 
     if vpn_is_up; then
@@ -50,7 +57,7 @@ start_vpn() {
     echo "Avvio VPN..."
     nohup sudo openfortivpn --config "$CONFIG" > "$LOG_UP" 2>&1 &
     VPN_PID=$!
-    sleep 3 # attendo 3 secondi per permettere a tutti i log di raggiungere $LOG_UP
+    sleep 5 # attendo 3 secondi per permettere a tutti i log di raggiungere $LOG_UP
     echo "Connessione in corso..."
     for ((i=1;i<=MAX_WAIT;i++)); do
         if vpn_is_up; then
