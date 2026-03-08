@@ -9,7 +9,9 @@ Il progetto automatizza:
 * recupero automatico del fingerprint del certificato
 * gestione della connessione VPN
 * assegnazione permessi ristretti (700) alla directory ~/.config/openfortivpn/
-* assegnazione permessi ristretti (600) alla directory ~/.config/openfortivpn/config
+* assegnazione permessi ristretti (600) al file ~/.config/openfortivpn/config
+* assegnazione permessi ristretti (600) al file ~/.config/openfortivpn/dnsservers
+* assegnazione permessi ristretti (600) al file ~/.config/openfortivpn/dnsdomain
 
 Testato su **Ubuntu / Kubuntu**.
 
@@ -71,10 +73,12 @@ Lo script eseguirà automaticamente:
 ~/.config/openfortivpn
 ```
 
-* creazione file di configurazione
+* creazione files di configurazione
 
 ```
 ~/.config/openfortivpn/config
+~/.config/openfortivpn/dnsservers
+~/.config/openfortivpn/dnsdomain
 ```
 
 * recupero automatico del fingerprint del certificato VPN
@@ -86,6 +90,7 @@ Durante l'installazione verranno richiesti:
 * username VPN
 * password VPN
 * DNS ASIENDALI (separati da spazio)
+* Default domain
 
 ---
 
