@@ -9,6 +9,10 @@ CONFIG="$CONFIG_BASEDIR/config"
 PID_FILE="$CONFIG_BASEDIR/vpn.pid"
 LOG_UP="$CONFIG_BASEDIR/vpn-up.log"
 MAX_WAIT=15   # secondi massimi di attesa connessione
+DNS_WAIT=10   # secondi massimi di attesa applicazione DNS
+DNS_LOG="$CONFIG_BASEDIR/dns-apply.log"
+DEBUG_LOG="$CONFIG_BASEDIR/debug.log"
+DNS_SEARCH_BACKUP="$CONFIG_BASEDIR/dns-search.backup"
 DNS_FILE="$CONFIG_BASEDIR/dnsservers"
 DNS_DOMAIN_FILE="$CONFIG_BASEDIR/dnsdomain"
 
@@ -24,24 +28,202 @@ DNS_DOMAIN_FILE="$CONFIG_BASEDIR/dnsdomain"
 # ---------- Funzioni ----------
 
 vpn_is_up() {
-    ip link show ppp0 >/dev/null 2>&1
+    ip -o link show 2>/dev/null | awk '/ppp[0-9]+/ {found=1} END{exit !found}'
+}
+
+detect_ppp_iface() {
+    # Preferisci un'interfaccia ppp "UP", altrimenti fallback a ppp0
+    local iface
+    iface=$(ip -o link show 2>/dev/null | awk -F': ' '/ppp[0-9]+/ && $0 ~ /state UP/ {print $2; exit}')
+    if [ -z "$iface" ]; then
+        iface=$(ip -o link show 2>/dev/null | awk -F': ' '/ppp[0-9]+/ {print $2; exit}')
+    fi
+    if [ -z "$iface" ]; then
+        iface="ppp0"
+    fi
+    echo "$iface"
+}
+
+wait_ppp_iface() {
+    local i
+    for ((i=1;i<=MAX_WAIT;i++)); do
+        if ip -o link show 2>/dev/null | awk '/ppp[0-9]+/ {found=1} END{exit !found}'; then
+            return 0
+        fi
+        sleep 1
+    done
+    return 1
+}
+
+wait_ppp_ip() {
+    local iface="$1"
+    local i
+    for ((i=1;i<=MAX_WAIT;i++)); do
+        if ip -o -4 addr show dev "$iface" 2>/dev/null | awk '{print $4}' | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/'; then
+            return 0
+        fi
+        sleep 1
+    done
+    return 1
+}
+
+wait_route_to_dns() {
+    local iface="$1"
+    local dns_servers="$2"
+    local first_dns
+    local i
+    first_dns=$(echo "$dns_servers" | awk '{print $1}')
+    if [ -z "$first_dns" ]; then
+        return 1
+    fi
+    for ((i=1;i<=MAX_WAIT;i++)); do
+        if ip route get "$first_dns" 2>/dev/null | grep -q "dev $iface"; then
+            return 0
+        fi
+        sleep 1
+    done
+    return 1
+}
+
+default_iface() {
+    ip route show default 2>/dev/null | awk '{print $5; exit}'
+}
+
+get_iface_domains() {
+    local iface="$1"
+    resolvectl domain "$iface" 2>/dev/null | sed -E 's/^[^:]*: ?//'
+}
+
+apply_search_domain_to_default_iface() {
+    local search_domain="$1"
+    local iface
+    local existing
+    iface=$(default_iface)
+    if [ -z "$iface" ]; then
+        echo "$(date '+%F %T') default iface non trovato" >> "$DNS_LOG"
+        return 1
+    fi
+    existing=$(get_iface_domains "$iface")
+    echo "$iface|$existing" > "$DNS_SEARCH_BACKUP"
+    if echo "$existing" | grep -q "$search_domain"; then
+        echo "$(date '+%F %T') search domain già presente su $iface: $search_domain" >> "$DNS_LOG"
+        return 0
+    fi
+    if [ -n "$existing" ]; then
+        # Metti il dominio VPN per primo per risolvere i nomi corti con priorità
+        sudo resolvectl domain "$iface" "$search_domain" $existing >>"$DNS_LOG" 2>&1
+    else
+        sudo resolvectl domain "$iface" "$search_domain" >>"$DNS_LOG" 2>&1
+    fi
+    echo "$(date '+%F %T') aggiunto search domain su $iface (first): $search_domain" >> "$DNS_LOG"
+    return 0
+}
+
+restore_search_domain_on_default_iface() {
+    local iface
+    local existing
+    if [ ! -f "$DNS_SEARCH_BACKUP" ]; then
+        return 0
+    fi
+    iface=$(cut -d'|' -f1 "$DNS_SEARCH_BACKUP")
+    existing=$(cut -d'|' -f2- "$DNS_SEARCH_BACKUP")
+    if [ -z "$iface" ]; then
+        rm -f "$DNS_SEARCH_BACKUP"
+        return 0
+    fi
+    if [ -n "$existing" ]; then
+        sudo resolvectl domain "$iface" $existing >/dev/null 2>&1
+    else
+        sudo resolvectl domain "$iface" >/dev/null 2>&1
+    fi
+    rm -f "$DNS_SEARCH_BACKUP"
+    return 0
+}
+
+check_resolved() {
+    local mode="$1"
+    if ! command -v resolvectl >/dev/null 2>&1; then
+        echo "Errore: resolvectl non trovato. Serve systemd-resolved attivo."
+        echo "Su Ubuntu/Debian: sudo apt install systemd-resolved && sudo systemctl enable --now systemd-resolved"
+        [ "$mode" = "warn" ] || exit 1
+        return 1
+    fi
+    if ! systemctl is-active --quiet systemd-resolved; then
+        echo "Errore: systemd-resolved non è attivo."
+        echo "Avvia: sudo systemctl enable --now systemd-resolved"
+        [ "$mode" = "warn" ] || exit 1
+        return 1
+    fi
+}
+
+wait_resolved_link() {
+    local iface="$1"
+    local i
+    for ((i=1;i<=DNS_WAIT;i++)); do
+        if resolvectl status "$iface" >/dev/null 2>&1; then
+            echo "$(date '+%F %T') resolved link ok: $iface (try $i)" >> "$DNS_LOG"
+            return 0
+        fi
+        echo "$(date '+%F %T') resolved link not ready: $iface (try $i)" >> "$DNS_LOG"
+        sleep 1
+    done
+    return 1
+}
+
+apply_dns_settings() {
+    local iface="$1"
+    local dns_servers="$2"
+    local dns_domain="$3"
+    local i
+    local clean_domain
+
+    clean_domain="${dns_domain#~}"
+
+    for ((i=1;i<=DNS_WAIT;i++)); do
+        echo "$(date '+%F %T') apply dns try $i iface=$iface dns='$dns_servers' domain='$clean_domain'" >> "$DNS_LOG"
+        # Imposta DNS e domain (domain anche come routing per evitare override)
+        if sudo resolvectl dns "$iface" $dns_servers >>"$DNS_LOG" 2>&1 \
+            && sudo resolvectl domain "$iface" "$clean_domain" "~$clean_domain" >>"$DNS_LOG" 2>&1; then
+            sleep 1
+            if resolvectl dns "$iface" 2>/dev/null | grep -q "$(echo "$dns_servers" | awk '{print $1}')" \
+                && resolvectl domain "$iface" 2>/dev/null | grep -q "$clean_domain"; then
+                echo "$(date '+%F %T') apply dns ok: iface=$iface" >> "$DNS_LOG"
+                return 0
+            fi
+        fi
+        echo "$(date '+%F %T') apply dns verify failed: iface=$iface" >> "$DNS_LOG"
+        sleep 1
+    done
+    return 1
 }
 
 start_vpn() {
+    : > "$DNS_LOG"
+    check_resolved
     if [ -f "$DNS_FILE" ]; then
         DNS_SERVERS=$(cat "$DNS_FILE")
         echo "Imposto DNS VPN: $DNS_SERVERS"
+        if [ -z "$DNS_SERVERS" ]; then
+            echo "Errore: lista DNS vuota in $DNS_FILE"
+            exit 1
+        fi
     else
         echo "Nessun file DNS trovato ($DNS_FILE)"
         echo "Riesegui install.sh o edita a mano $DNS_FILE"
+        exit 1
     fi
 
     if [ -f "$DNS_DOMAIN_FILE" ]; then
         DNS_DOMAIN=$(cat "$DNS_DOMAIN_FILE")
-        echo "Imposto Default domain VPN: $DNS_DOMAIN_FILE"
+        echo "Imposto Default domain VPN: $DNS_DOMAIN"
+        if [ -z "$DNS_DOMAIN" ]; then
+            echo "Errore: default domain vuoto in $DNS_DOMAIN_FILE"
+            exit 1
+        fi
     else
-        echo "Nessun file Default domain trovato ($DNS_DOMAIN)"
+        echo "Nessun file Default domain trovato ($DNS_DOMAIN_FILE)"
         echo "Riesegui install.sh o edita a mano $DNS_DOMAIN_FILE"
+        exit 1
     fi
 
     if vpn_is_up; then
@@ -60,16 +242,28 @@ start_vpn() {
     sleep 5 # attendo 3 secondi per permettere a tutti i log di raggiungere $LOG_UP
     echo "Connessione in corso..."
     for ((i=1;i<=MAX_WAIT;i++)); do
-        if vpn_is_up; then
+        if wait_ppp_iface; then
             echo "$VPN_PID" > "$PID_FILE"
-            # imposto dns resolver e dafault domain aziendali
-            sudo resolvectl dns ppp0 $DNS_SERVERS
-            sudo resolvectl domain ppp0 $DNS_DOMAIN
-            ip address show ppp0 >> $LOG_UP
-            echo "DNS $(resolvectl dns ppp0)" >> $LOG_UP
+            VPN_IFACE=$(detect_ppp_iface)
+            if ! wait_ppp_ip "$VPN_IFACE"; then
+                echo "$(date '+%F %T') ppp ip non assegnato entro tempo su $VPN_IFACE" >> "$DNS_LOG"
+            fi
+            if ! wait_route_to_dns "$VPN_IFACE" "$DNS_SERVERS"; then
+                echo "$(date '+%F %T') route ai DNS non pronta su $VPN_IFACE" >> "$DNS_LOG"
+            fi
+            # Imposto DNS dopo che systemd-resolved vede l'interfaccia
+            if ! wait_resolved_link "$VPN_IFACE"; then
+                echo "Attenzione: systemd-resolved non ha ancora registrato $VPN_IFACE"
+            fi
+            if ! apply_dns_settings "$VPN_IFACE" "$DNS_SERVERS" "$DNS_DOMAIN"; then
+                echo "Attenzione: impossibile applicare i DNS su $VPN_IFACE"
+            fi
+            apply_search_domain_to_default_iface "$DNS_DOMAIN"
+            ip address show "$VPN_IFACE" >> "$LOG_UP"
+            echo "DNS $(resolvectl dns "$VPN_IFACE")" >> "$LOG_UP"
             echo "Default domain: $DNS_DOMAIN" >> $LOG_UP
             notify-send "VPN" "Connessa"
-            echo "VPN connessa (PID $VPN_PID)"
+            echo "VPN connessa (PID $VPN_PID, IFACE $VPN_IFACE)"
             echo "------ Contenuto vpn-up.log ------"
             cat "$LOG_UP"
             echo "---------------------------------"
@@ -91,6 +285,11 @@ stop_vpn() {
         VPN_PID=$(cat "$PID_FILE" 2>/dev/null)
         sudo kill "$VPN_PID" 2>/dev/null
         sleep 2
+        VPN_IFACE=$(detect_ppp_iface)
+        if ip link show "$VPN_IFACE" >/dev/null 2>&1; then
+            sudo resolvectl revert "$VPN_IFACE" >/dev/null 2>&1
+        fi
+        restore_search_domain_on_default_iface
         rm -f "$PID_FILE"
         notify-send "VPN" "Disconnessa"
         echo "VPN disconnessa."
@@ -111,6 +310,59 @@ status_vpn() {
     fi
 }
 
+debug_vpn() {
+    : > "$DEBUG_LOG"
+    echo "Debug VPN - $(date '+%F %T')" | tee -a "$DEBUG_LOG"
+    echo "Config dir: $CONFIG_BASEDIR" | tee -a "$DEBUG_LOG"
+    echo "PID file: $PID_FILE" | tee -a "$DEBUG_LOG"
+    echo "DNS file: $DNS_FILE" | tee -a "$DEBUG_LOG"
+    echo "DNS domain file: $DNS_DOMAIN_FILE" | tee -a "$DEBUG_LOG"
+    check_resolved warn | tee -a "$DEBUG_LOG"
+    RESOLVED_OK=$?
+    echo "--- ip link ---" | tee -a "$DEBUG_LOG"
+    ip -o link show | tee -a "$DEBUG_LOG"
+    echo "--- ip addr ---" | tee -a "$DEBUG_LOG"
+    ip -o addr show | tee -a "$DEBUG_LOG"
+    echo "--- resolvectl status ---" | tee -a "$DEBUG_LOG"
+    RESOLV_STATUS=$(resolvectl status 2>/dev/null)
+    echo "$RESOLV_STATUS" | tee -a "$DEBUG_LOG"
+    RESOLVCONF_MODE=$(echo "$RESOLV_STATUS" | awk -F': ' '/resolv.conf mode/ {print $2; exit}')
+    VPN_IFACE=$(detect_ppp_iface)
+    echo "--- resolvectl status $VPN_IFACE ---" | tee -a "$DEBUG_LOG"
+    resolvectl status "$VPN_IFACE" | tee -a "$DEBUG_LOG"
+    echo "--- resolvectl dns $VPN_IFACE ---" | tee -a "$DEBUG_LOG"
+    resolvectl dns "$VPN_IFACE" | tee -a "$DEBUG_LOG"
+    echo "--- resolvectl domain $VPN_IFACE ---" | tee -a "$DEBUG_LOG"
+    resolvectl domain "$VPN_IFACE" | tee -a "$DEBUG_LOG"
+    echo "--- journalctl (systemd-resolved, last 200) ---" | tee -a "$DEBUG_LOG"
+    sudo journalctl -u systemd-resolved -n 200 | tee -a "$DEBUG_LOG"
+    echo "--- summary ---" | tee -a "$DEBUG_LOG"
+    if [ "$RESOLVED_OK" -eq 0 ]; then
+        echo "systemd-resolved: OK" | tee -a "$DEBUG_LOG"
+    else
+        echo "systemd-resolved: FAIL" | tee -a "$DEBUG_LOG"
+    fi
+    if vpn_is_up; then
+        VPN_IFACE=$(detect_ppp_iface)
+        VPN_IP=$(ip -o -4 addr show dev "$VPN_IFACE" 2>/dev/null | awk '{print $4; exit}')
+        VPN_DNS=$(resolvectl dns "$VPN_IFACE" 2>/dev/null | sed -E 's/^[^:]*: ?//')
+        VPN_DOMAINS=$(resolvectl domain "$VPN_IFACE" 2>/dev/null | sed -E 's/^[^:]*: ?//')
+        DEF_IFACE=$(default_iface)
+        DEF_DOMAINS=$(resolvectl domain "$DEF_IFACE" 2>/dev/null | sed -E 's/^[^:]*: ?//')
+        echo "vpn: UP" | tee -a "$DEBUG_LOG"
+        echo "vpn_iface: $VPN_IFACE" | tee -a "$DEBUG_LOG"
+        echo "vpn_ip: ${VPN_IP:-n/a}" | tee -a "$DEBUG_LOG"
+        echo "vpn_dns: ${VPN_DNS:-n/a}" | tee -a "$DEBUG_LOG"
+        echo "vpn_domains: ${VPN_DOMAINS:-n/a}" | tee -a "$DEBUG_LOG"
+        echo "default_iface: ${DEF_IFACE:-n/a}" | tee -a "$DEBUG_LOG"
+        echo "default_domains: ${DEF_DOMAINS:-n/a}" | tee -a "$DEBUG_LOG"
+    else
+        echo "vpn: DOWN" | tee -a "$DEBUG_LOG"
+    fi
+    echo "resolv.conf mode: ${RESOLVCONF_MODE:-n/a}" | tee -a "$DEBUG_LOG"
+    echo "Log salvato in $DEBUG_LOG"
+}
+
 # ---------- Main ----------
 
 # forza richiesta password sudo
@@ -120,8 +372,9 @@ case "$1" in
     start) start_vpn ;;
     stop) stop_vpn ;;
     status) status_vpn ;;
+    debug) debug_vpn ;;
     *)
-        echo "Uso: $0 {start|stop|status}"
+        echo "Uso: $0 {start|stop|status|debug}"
         exit 1
         ;;
 esac
