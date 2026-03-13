@@ -122,6 +122,10 @@ Per una diagnostica completa (log estesi e riepilogo):
 ```bash
 ./vpn-aziendale.sh debug
 ```
+Il comando `debug` include anche:
+
+* verifica dei routing domain applicati su `pppX` (inclusi eventuali domini extra)
+* test attivo di risoluzione: `resolvectl query comune.spoleto.pg.it`
 
 ---
 

@@ -395,6 +395,8 @@ debug_vpn() {
     resolvectl dns "$VPN_IFACE" | tee -a "$DEBUG_LOG"
     echo "--- resolvectl domain $VPN_IFACE ---" | tee -a "$DEBUG_LOG"
     resolvectl domain "$VPN_IFACE" | tee -a "$DEBUG_LOG"
+    echo "--- resolvectl query comune.spoleto.pg.it ---" | tee -a "$DEBUG_LOG"
+    resolvectl query comune.spoleto.pg.it 2>&1 | tee -a "$DEBUG_LOG"
     if [ -f "$DNS_EXTRA_DOMAINS_FILE" ]; then
         echo "--- dnsdomain-extra ---" | tee -a "$DEBUG_LOG"
         cat "$DNS_EXTRA_DOMAINS_FILE" | tee -a "$DEBUG_LOG"
