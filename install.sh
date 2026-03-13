@@ -17,6 +17,7 @@ CONFIG_BASEDIR="$HOME/.config/openfortivpn"
 CONFIG_FILE="$CONFIG_BASEDIR/config"
 DNS_FILE="$CONFIG_BASEDIR/dnsservers"
 DNS_DOMAIN_FILE="$CONFIG_BASEDIR/dnsdomain"
+DNS_EXTRA_DOMAINS_FILE="$CONFIG_BASEDIR/dnsdomain-extra"
 
 # Crea directory
 if [ ! -d "$CONFIG_BASEDIR" ]; then
@@ -40,6 +41,7 @@ read -p "Porta VPN [443]: " VPN_PORT
 VPN_PORT=${VPN_PORT:-443}
 read -p "Lista DNS aziendali (separati da spazio): " VPN_DNS
 read -p "Default domain: " VPN_DOMAIN
+read -p "Domini aggiuntivi da risolvere sulla VPN (separati da spazio, opzionale): " VPN_EXTRA_DOMAINS
 read -p "Username VPN: " VPN_USER
 read -s -p "Password VPN: " VPN_PASS
 echo
@@ -117,6 +119,12 @@ EOF
 # Scrittura DNS file
 echo "$VPN_DNS" > "$DNS_FILE"
 echo "$VPN_DOMAIN" > "$DNS_DOMAIN_FILE"
+if [ -n "$VPN_EXTRA_DOMAINS" ]; then
+    echo "$VPN_EXTRA_DOMAINS" > "$DNS_EXTRA_DOMAINS_FILE"
+    chmod 600 "$DNS_EXTRA_DOMAINS_FILE"
+else
+    rm -f "$DNS_EXTRA_DOMAINS_FILE"
+fi
 
 # Assegnazione permessi ristretti ai files di configurazione
 chmod 600 "$CONFIG_FILE"
@@ -127,4 +135,7 @@ echo
 echo "Configurazione salvata in $CONFIG_FILE"
 echo "DNS aziendali salvati in $DNS_FILE"
 echo "Default domain salvato in $DNS_DOMAIN_FILE"
+if [ -n "$VPN_EXTRA_DOMAINS" ]; then
+    echo "Domini extra salvati in $DNS_EXTRA_DOMAINS_FILE"
+fi
 echo "Installazione completata con successo."

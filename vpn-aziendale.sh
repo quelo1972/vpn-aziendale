@@ -15,6 +15,7 @@ DEBUG_LOG="$CONFIG_BASEDIR/debug.log"
 DNS_SEARCH_BACKUP="$CONFIG_BASEDIR/dns-search.backup"
 DNS_FILE="$CONFIG_BASEDIR/dnsservers"
 DNS_DOMAIN_FILE="$CONFIG_BASEDIR/dnsdomain"
+DNS_EXTRA_DOMAINS_FILE="$CONFIG_BASEDIR/dnsdomain-extra"
 
 #if [ -f "$DNS_FILE" ]; then
 #    DNS_SERVERS=$(cat "$DNS_FILE")
@@ -174,16 +175,27 @@ apply_dns_settings() {
     local iface="$1"
     local dns_servers="$2"
     local dns_domain="$3"
+    local extra_domains="$4"
     local i
     local clean_domain
+    local domain_args
 
     clean_domain="${dns_domain#~}"
+    domain_args=("$clean_domain" "~$clean_domain")
+    if [ -n "$extra_domains" ]; then
+        for d in $extra_domains; do
+            d="${d#~}"
+            if [ -n "$d" ]; then
+                domain_args+=("~$d")
+            fi
+        done
+    fi
 
     for ((i=1;i<=DNS_WAIT;i++)); do
-        echo "$(date '+%F %T') apply dns try $i iface=$iface dns='$dns_servers' domain='$clean_domain'" >> "$DNS_LOG"
+        echo "$(date '+%F %T') apply dns try $i iface=$iface dns='$dns_servers' domain='$clean_domain' extra='${extra_domains:-n/a}'" >> "$DNS_LOG"
         # Imposta DNS e domain (domain anche come routing per evitare override)
         if sudo resolvectl dns "$iface" $dns_servers >>"$DNS_LOG" 2>&1 \
-            && sudo resolvectl domain "$iface" "$clean_domain" "~$clean_domain" >>"$DNS_LOG" 2>&1; then
+            && sudo resolvectl domain "$iface" "${domain_args[@]}" >>"$DNS_LOG" 2>&1; then
             sleep 1
             if resolvectl dns "$iface" 2>/dev/null | grep -q "$(echo "$dns_servers" | awk '{print $1}')" \
                 && resolvectl domain "$iface" 2>/dev/null | grep -q "$clean_domain"; then
@@ -225,6 +237,13 @@ start_vpn() {
         echo "Riesegui install.sh o edita a mano $DNS_DOMAIN_FILE"
         exit 1
     fi
+    DNS_EXTRA_DOMAINS=""
+    if [ -f "$DNS_EXTRA_DOMAINS_FILE" ]; then
+        DNS_EXTRA_DOMAINS=$(cat "$DNS_EXTRA_DOMAINS_FILE")
+        if [ -n "$DNS_EXTRA_DOMAINS" ]; then
+            echo "Imposto domini extra VPN (routing): $DNS_EXTRA_DOMAINS"
+        fi
+    fi
 
     if vpn_is_up; then
         echo "VPN già attiva."
@@ -255,7 +274,7 @@ start_vpn() {
             if ! wait_resolved_link "$VPN_IFACE"; then
                 echo "Attenzione: systemd-resolved non ha ancora registrato $VPN_IFACE"
             fi
-            if ! apply_dns_settings "$VPN_IFACE" "$DNS_SERVERS" "$DNS_DOMAIN"; then
+            if ! apply_dns_settings "$VPN_IFACE" "$DNS_SERVERS" "$DNS_DOMAIN" "$DNS_EXTRA_DOMAINS"; then
                 echo "Attenzione: impossibile applicare i DNS su $VPN_IFACE"
             fi
             apply_search_domain_to_default_iface "$DNS_DOMAIN"
