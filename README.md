@@ -73,15 +73,14 @@ Lo script eseguirà automaticamente:
 ~/.config/openfortivpn
 ```
 
-* creazione files di configurazione
-
-```
-~/.config/openfortivpn/config
-~/.config/openfortivpn/dnsservers
-~/.config/openfortivpn/dnsdomain
-```
-
 * recupero automatico del fingerprint del certificato VPN
+
+File creati/aggiornati da `install.sh`:
+
+* `~/.config/openfortivpn/` (directory)
+* `~/.config/openfortivpn/config`
+* `~/.config/openfortivpn/dnsservers`
+* `~/.config/openfortivpn/dnsdomain`
 
 Durante l'installazione verranno richiesti:
 
@@ -115,6 +114,12 @@ Per verificare lo stato della connessione:
 ./vpn-aziendale.sh status
 ```
 
+Per una diagnostica completa (log estesi e riepilogo):
+
+```bash
+./vpn-aziendale.sh debug
+```
+
 ---
 
 # Verifica della connessione
@@ -137,6 +142,13 @@ Controllo DNS assegnato dalla VPN:
 resolvectl dns ppp0
 ```
 
+Controllo domini e link di default:
+
+```bash
+resolvectl domain ppp0
+resolvectl status
+```
+
 Nota importante sulla risoluzione dei nomi corti:
 
 * il dominio su `ppp0` viene impostato come **routing domain** (`~comune.spoleto.local`) per limitare l'inoltro solo alle query interne
@@ -151,6 +163,20 @@ Portabilità su altri sistemi:
 * **richiede `systemd-resolved` e `resolvectl`** per configurare i DNS
   * se `resolvectl` non è presente o `systemd-resolved` non è attivo, lo script segnala l'errore e si ferma
 
+Log generati:
+
+* `~/.config/openfortivpn/vpn-up.log` — log di openfortivpn e stato interfaccia
+* `~/.config/openfortivpn/dns-apply.log` — tentativi di applicazione DNS con timestamp
+* `~/.config/openfortivpn/debug.log` — output completo del comando `debug`
+
+File creati/aggiornati da `vpn-aziendale.sh`:
+
+* `~/.config/openfortivpn/vpn.pid` — PID della sessione VPN
+* `~/.config/openfortivpn/vpn-up.log`
+* `~/.config/openfortivpn/dns-apply.log`
+* `~/.config/openfortivpn/debug.log`
+* `~/.config/openfortivpn/dns-search.backup` — backup dei search domain della link di default
+
 ---
 
 # Struttura del progetto
@@ -160,6 +186,7 @@ vpn-aziendale
 │
 ├── install.sh
 ├── vpn-aziendale.sh
+├── CHANGELOG.md
 └── README.md
 ```
 
@@ -179,6 +206,7 @@ Script principale per la gestione della VPN:
 * avvio della connessione
 * disconnessione
 * verifica stato VPN
+* diagnostica estesa (`debug`)
 
 ---
 
@@ -237,5 +265,11 @@ Questo progetto è distribuito sotto licenza open source.
 # Autore
 
 Andrea Rossetti
+
+---
+
+# Changelog
+
+Vedi `CHANGELOG.md` per la lista delle modifiche per versione.
 
 [1]: https://github.com/adrienverge/openfortivpn?utm_source=chatgpt.com "GitHub - adrienverge/openfortivpn: Client for PPP+TLS VPN tunnel services"
