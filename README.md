@@ -137,6 +137,20 @@ Controllo DNS assegnato dalla VPN:
 resolvectl dns ppp0
 ```
 
+Nota importante sulla risoluzione dei nomi corti:
+
+* il dominio su `ppp0` viene impostato come **routing domain** (`~comune.spoleto.local`) per limitare l'inoltro solo alle query interne
+* i nomi **senza dominio** (es. `srvw3kdc01`) usano i *search domain* della **link di default**
+* per questo lo script aggiunge `comune.spoleto.local` come **primo search domain** sulla link di default (es. `wlp2s0`)
+* al comando `stop`, il dominio precedente viene ripristinato automaticamente
+
+Portabilità su altri sistemi:
+
+* lo script è **indipendente dal nome della link di default** (usa `ip route` per trovarla)
+* gestisce automaticamente interfacce `pppX` create da `openfortivpn`
+* **richiede `systemd-resolved` e `resolvectl`** per configurare i DNS
+  * se `resolvectl` non è presente o `systemd-resolved` non è attivo, lo script segnala l'errore e si ferma
+
 ---
 
 # Struttura del progetto
