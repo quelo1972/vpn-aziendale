@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+### DNS e domini extra
+- Supporto a `dnsdomain-extra` per aggiungere routing domain aggiuntivi su `pppX`.
+- Aggiunto comando `reload-dns` per ricaricare DNS/domains senza disconnessione.
+- Cleanup DNS/domains piu' pulito allo `stop`.
+
+### Diagnostica
+- Verifica dei routing domain applicati (inclusi extra).
+- Test attivo di risoluzione: `resolvectl query comune.spoleto.pg.it`.
+
+### Documentazione
+- Aggiornato README con domini extra, diagnostica e nuovo comando.
+
 ## v1.2.0
 
 ### Affidabilità DNS
