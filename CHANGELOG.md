@@ -2,22 +2,22 @@
 
 ## v1.2.0
 
-### DNS reliability
-- Fixed false negatives when PPP link is state UNKNOWN by detecting any `pppX` interface.
-- Added wait for PPP interface presence, IP assignment, and route to DNS servers before DNS setup.
-- Wait for systemd-resolved to register the PPP link before applying DNS.
+### Affidabilità DNS
+- Corretti i falsi negativi quando il link PPP è in stato UNKNOWN rilevando qualsiasi interfaccia `pppX`.
+- Aggiunta attesa di presenza interfaccia PPP, assegnazione IP e route verso i DNS prima della configurazione DNS.
+- Attesa che systemd-resolved registri il link PPP prima di applicare i DNS.
 
-### DNS behavior
-- Apply VPN DNS servers and routing domain (`~comune.spoleto.local`) to the PPP link.
-- Add VPN search domain to the default interface and force it to be first in the list.
-- Backup and restore default interface search domains on stop.
+### Comportamento DNS
+- Applicati i DNS VPN e il routing domain (`~comune.spoleto.local`) al link PPP.
+- Aggiunto il dominio di ricerca VPN alla interfaccia di default e forzata la priorità come primo in lista.
+- Backup e ripristino dei domini di ricerca della interfaccia di default allo stop.
 
-### Diagnostics
-- Added `dns-apply.log` with per-try timestamps and `resolvectl` output.
-- Expanded debug report with VPN iface/IP/DNS/domains and default iface domains.
-- Added `resolv.conf` mode to debug summary.
-- Added checks for `resolvectl` and `systemd-resolved` (fatal in `start`, warning in `debug`).
+### Diagnostica
+- Aggiunto `dns-apply.log` con timestamp per tentativo e output di `resolvectl`.
+- Esteso il report di debug con interfaccia/IP/DNS/domini VPN e domini della interfaccia di default.
+- Aggiunto `resolv.conf` mode nel riepilogo debug.
+- Aggiunti controlli per `resolvectl` e `systemd-resolved` (fatale in `start`, warning in `debug`).
 
-### Docs
-- Documented routing-domain behavior and search-domain priority.
-- Documented portability assumptions and `systemd-resolved` requirement.
+### Documentazione
+- Documentato il comportamento dei routing-domain e la priorità dei search-domain.
+- Documentate le assunzioni di portabilità e il requisito di `systemd-resolved`.
