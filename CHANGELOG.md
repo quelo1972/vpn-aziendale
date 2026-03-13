@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v1.2.1
 
 ### DNS e domini extra
 - Supporto a `dnsdomain-extra` per aggiungere routing domain aggiuntivi su `pppX`.

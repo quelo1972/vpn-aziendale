@@ -287,6 +287,6 @@ Andrea Rossetti
 # Changelog
 
 Vedi `CHANGELOG.md` per la lista delle modifiche per versione.
-Ultimo rilascio: `v1.2.0`.
+Ultimo rilascio: `v1.2.1`.
 
 [1]: https://github.com/adrienverge/openfortivpn?utm_source=chatgpt.com "GitHub - adrienverge/openfortivpn: Client for PPP+TLS VPN tunnel services"
