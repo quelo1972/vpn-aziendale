@@ -127,6 +127,12 @@ Il comando `debug` include anche:
 * verifica dei routing domain applicati su `pppX` (inclusi eventuali domini extra)
 * test attivo di risoluzione: `resolvectl query comune.spoleto.pg.it`
 
+Per ricaricare i DNS senza disconnettere la VPN:
+
+```bash
+./vpn-aziendale.sh reload-dns
+```
+
 ---
 
 # Verifica della connessione

@@ -439,6 +439,56 @@ debug_vpn() {
     echo "Log salvato in $DEBUG_LOG"
 }
 
+reload_dns() {
+    check_resolved
+    if ! vpn_is_up; then
+        echo "VPN non attiva."
+        return 1
+    fi
+    if [ -f "$DNS_FILE" ]; then
+        DNS_SERVERS=$(cat "$DNS_FILE")
+        if [ -z "$DNS_SERVERS" ]; then
+            echo "Errore: lista DNS vuota in $DNS_FILE"
+            return 1
+        fi
+    else
+        echo "Nessun file DNS trovato ($DNS_FILE)"
+        return 1
+    fi
+
+    if [ -f "$DNS_DOMAIN_FILE" ]; then
+        DNS_DOMAIN=$(cat "$DNS_DOMAIN_FILE")
+        if [ -z "$DNS_DOMAIN" ]; then
+            echo "Errore: default domain vuoto in $DNS_DOMAIN_FILE"
+            return 1
+        fi
+    else
+        echo "Nessun file Default domain trovato ($DNS_DOMAIN_FILE)"
+        return 1
+    fi
+
+    DNS_EXTRA_DOMAINS=""
+    if [ -f "$DNS_EXTRA_DOMAINS_FILE" ]; then
+        DNS_EXTRA_DOMAINS=$(cat "$DNS_EXTRA_DOMAINS_FILE")
+    fi
+
+    VPN_IFACE=$(detect_ppp_iface)
+    if ! wait_resolved_link "$VPN_IFACE"; then
+        echo "Attenzione: systemd-resolved non ha ancora registrato $VPN_IFACE"
+    fi
+    if ! apply_dns_settings "$VPN_IFACE" "$DNS_SERVERS" "$DNS_DOMAIN" "$DNS_EXTRA_DOMAINS"; then
+        echo "Attenzione: impossibile applicare i DNS su $VPN_IFACE"
+        return 1
+    fi
+    apply_search_domain_to_default_iface "$DNS_DOMAIN"
+    if [ -n "$DNS_EXTRA_DOMAINS" ]; then
+        echo "Domini extra applicati su $VPN_IFACE (routing): $DNS_EXTRA_DOMAINS"
+    fi
+    verify_routing_domains "$VPN_IFACE" "$DNS_DOMAIN" "$DNS_EXTRA_DOMAINS"
+    echo "DNS ricaricati su $VPN_IFACE"
+    return 0
+}
+
 # ---------- Main ----------
 
 # forza richiesta password sudo
@@ -449,8 +499,9 @@ case "$1" in
     stop) stop_vpn ;;
     status) status_vpn ;;
     debug) debug_vpn ;;
+    reload-dns) reload_dns ;;
     *)
-        echo "Uso: $0 {start|stop|status|debug}"
+        echo "Uso: $0 {start|stop|status|debug|reload-dns}"
         exit 1
         ;;
 esac
