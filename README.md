@@ -12,6 +12,7 @@ Il progetto automatizza:
 * assegnazione permessi ristretti (600) al file ~/.config/openfortivpn/config
 * assegnazione permessi ristretti (600) al file ~/.config/openfortivpn/dnsservers
 * assegnazione permessi ristretti (600) al file ~/.config/openfortivpn/dnsdomain
+* assegnazione permessi ristretti (600) al file ~/.config/openfortivpn/dnsdomain-extra (opzionale)
 
 Testato su **Ubuntu / Kubuntu**.
 
@@ -81,6 +82,7 @@ File creati/aggiornati da `install.sh`:
 * `~/.config/openfortivpn/config`
 * `~/.config/openfortivpn/dnsservers`
 * `~/.config/openfortivpn/dnsdomain`
+* `~/.config/openfortivpn/dnsdomain-extra` (opzionale)
 
 Durante l'installazione verranno richiesti:
 
@@ -90,6 +92,7 @@ Durante l'installazione verranno richiesti:
 * password VPN
 * DNS ASIENDALI (separati da spazio)
 * Default domain
+* Domini aggiuntivi (opzionale, separati da spazio)
 
 ---
 
@@ -118,6 +121,16 @@ Per una diagnostica completa (log estesi e riepilogo):
 
 ```bash
 ./vpn-aziendale.sh debug
+```
+Il comando `debug` include anche:
+
+* verifica dei routing domain applicati su `pppX` (inclusi eventuali domini extra)
+* test attivo di risoluzione: `resolvectl query comune.spoleto.pg.it`
+
+Per ricaricare i DNS senza disconnettere la VPN:
+
+```bash
+./vpn-aziendale.sh reload-dns
 ```
 
 ---
@@ -168,6 +181,7 @@ Log generati:
 * `~/.config/openfortivpn/vpn-up.log` — log di openfortivpn e stato interfaccia
 * `~/.config/openfortivpn/dns-apply.log` — tentativi di applicazione DNS con timestamp
 * `~/.config/openfortivpn/debug.log` — output completo del comando `debug`
+* `~/.config/openfortivpn/dnsdomain-extra` — domini aggiuntivi da risolvere via VPN (routing)
 
 File creati/aggiornati da `vpn-aziendale.sh`:
 
@@ -176,6 +190,7 @@ File creati/aggiornati da `vpn-aziendale.sh`:
 * `~/.config/openfortivpn/dns-apply.log`
 * `~/.config/openfortivpn/debug.log`
 * `~/.config/openfortivpn/dns-search.backup` — backup dei search domain della link di default
+* `~/.config/openfortivpn/dnsdomain-extra` — domini aggiuntivi da risolvere via VPN (routing)
 
 ---
 
@@ -252,6 +267,7 @@ I files di configurazione contiengono le credenziali, dns servers, default domai
 chmod 600 ~/.config/openfortivpn/config
 chmod 600 ~/.config/openfortivpn/dnsservers
 chmod 600 ~/.config/openfortivpn/dnsdomain
+chmod 600 ~/.config/openfortivpn/dnsdomain-extra
 ```
 
 ---

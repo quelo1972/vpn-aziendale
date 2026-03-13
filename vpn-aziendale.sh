@@ -15,6 +15,7 @@ DEBUG_LOG="$CONFIG_BASEDIR/debug.log"
 DNS_SEARCH_BACKUP="$CONFIG_BASEDIR/dns-search.backup"
 DNS_FILE="$CONFIG_BASEDIR/dnsservers"
 DNS_DOMAIN_FILE="$CONFIG_BASEDIR/dnsdomain"
+DNS_EXTRA_DOMAINS_FILE="$CONFIG_BASEDIR/dnsdomain-extra"
 
 #if [ -f "$DNS_FILE" ]; then
 #    DNS_SERVERS=$(cat "$DNS_FILE")
@@ -174,16 +175,27 @@ apply_dns_settings() {
     local iface="$1"
     local dns_servers="$2"
     local dns_domain="$3"
+    local extra_domains="$4"
     local i
     local clean_domain
+    local domain_args
 
     clean_domain="${dns_domain#~}"
+    domain_args=("$clean_domain" "~$clean_domain")
+    if [ -n "$extra_domains" ]; then
+        for d in $extra_domains; do
+            d="${d#~}"
+            if [ -n "$d" ]; then
+                domain_args+=("~$d")
+            fi
+        done
+    fi
 
     for ((i=1;i<=DNS_WAIT;i++)); do
-        echo "$(date '+%F %T') apply dns try $i iface=$iface dns='$dns_servers' domain='$clean_domain'" >> "$DNS_LOG"
+        echo "$(date '+%F %T') apply dns try $i iface=$iface dns='$dns_servers' domain='$clean_domain' extra='${extra_domains:-n/a}'" >> "$DNS_LOG"
         # Imposta DNS e domain (domain anche come routing per evitare override)
         if sudo resolvectl dns "$iface" $dns_servers >>"$DNS_LOG" 2>&1 \
-            && sudo resolvectl domain "$iface" "$clean_domain" "~$clean_domain" >>"$DNS_LOG" 2>&1; then
+            && sudo resolvectl domain "$iface" "${domain_args[@]}" >>"$DNS_LOG" 2>&1; then
             sleep 1
             if resolvectl dns "$iface" 2>/dev/null | grep -q "$(echo "$dns_servers" | awk '{print $1}')" \
                 && resolvectl domain "$iface" 2>/dev/null | grep -q "$clean_domain"; then
@@ -194,6 +206,33 @@ apply_dns_settings() {
         echo "$(date '+%F %T') apply dns verify failed: iface=$iface" >> "$DNS_LOG"
         sleep 1
     done
+    return 1
+}
+
+verify_routing_domains() {
+    local iface="$1"
+    local main_domain="$2"
+    local extra_domains="$3"
+    local domains_line
+    local missing=""
+    local d
+
+    domains_line=$(resolvectl domain "$iface" 2>/dev/null | sed -E 's/^[^:]*: ?//')
+    for d in $main_domain $extra_domains; do
+        d="${d#~}"
+        [ -z "$d" ] && continue
+        if ! echo "$domains_line" | grep -q "~$d"; then
+            missing="$missing $d"
+        fi
+    done
+
+    if [ -z "$missing" ]; then
+        echo "$(date '+%F %T') routing domains ok: iface=$iface main='$main_domain' extra='${extra_domains:-n/a}'" >> "$DNS_LOG"
+        echo "Routing domains OK su $iface (extra: ${extra_domains:-n/a})"
+        return 0
+    fi
+    echo "$(date '+%F %T') routing domains missing: iface=$iface missing='${missing# }' domains='$domains_line'" >> "$DNS_LOG"
+    echo "Attenzione: routing domains mancanti su $iface:${missing}"
     return 1
 }
 
@@ -225,6 +264,13 @@ start_vpn() {
         echo "Riesegui install.sh o edita a mano $DNS_DOMAIN_FILE"
         exit 1
     fi
+    DNS_EXTRA_DOMAINS=""
+    if [ -f "$DNS_EXTRA_DOMAINS_FILE" ]; then
+        DNS_EXTRA_DOMAINS=$(cat "$DNS_EXTRA_DOMAINS_FILE")
+        if [ -n "$DNS_EXTRA_DOMAINS" ]; then
+            echo "Imposto domini extra VPN (routing): $DNS_EXTRA_DOMAINS"
+        fi
+    fi
 
     if vpn_is_up; then
         echo "VPN già attiva."
@@ -255,10 +301,21 @@ start_vpn() {
             if ! wait_resolved_link "$VPN_IFACE"; then
                 echo "Attenzione: systemd-resolved non ha ancora registrato $VPN_IFACE"
             fi
-            if ! apply_dns_settings "$VPN_IFACE" "$DNS_SERVERS" "$DNS_DOMAIN"; then
+            DNS_APPLIED=0
+            if ! apply_dns_settings "$VPN_IFACE" "$DNS_SERVERS" "$DNS_DOMAIN" "$DNS_EXTRA_DOMAINS"; then
                 echo "Attenzione: impossibile applicare i DNS su $VPN_IFACE"
+            else
+                DNS_APPLIED=1
             fi
             apply_search_domain_to_default_iface "$DNS_DOMAIN"
+            if [ -n "$DNS_EXTRA_DOMAINS" ]; then
+                if [ "$DNS_APPLIED" -eq 1 ]; then
+                    echo "Domini extra applicati su $VPN_IFACE (routing): $DNS_EXTRA_DOMAINS"
+                else
+                    echo "Domini extra non applicati (routing) per errore DNS: $DNS_EXTRA_DOMAINS"
+                fi
+            fi
+            verify_routing_domains "$VPN_IFACE" "$DNS_DOMAIN" "$DNS_EXTRA_DOMAINS"
             ip address show "$VPN_IFACE" >> "$LOG_UP"
             echo "DNS $(resolvectl dns "$VPN_IFACE")" >> "$LOG_UP"
             echo "Default domain: $DNS_DOMAIN" >> $LOG_UP
@@ -287,6 +344,9 @@ stop_vpn() {
         sleep 2
         VPN_IFACE=$(detect_ppp_iface)
         if ip link show "$VPN_IFACE" >/dev/null 2>&1; then
+            # Pulisce DNS/domains espliciti prima del revert
+            sudo resolvectl domain "$VPN_IFACE" >/dev/null 2>&1
+            sudo resolvectl dns "$VPN_IFACE" >/dev/null 2>&1
             sudo resolvectl revert "$VPN_IFACE" >/dev/null 2>&1
         fi
         restore_search_domain_on_default_iface
@@ -317,6 +377,7 @@ debug_vpn() {
     echo "PID file: $PID_FILE" | tee -a "$DEBUG_LOG"
     echo "DNS file: $DNS_FILE" | tee -a "$DEBUG_LOG"
     echo "DNS domain file: $DNS_DOMAIN_FILE" | tee -a "$DEBUG_LOG"
+    echo "DNS extra domain file: $DNS_EXTRA_DOMAINS_FILE" | tee -a "$DEBUG_LOG"
     check_resolved warn | tee -a "$DEBUG_LOG"
     RESOLVED_OK=$?
     echo "--- ip link ---" | tee -a "$DEBUG_LOG"
@@ -334,6 +395,12 @@ debug_vpn() {
     resolvectl dns "$VPN_IFACE" | tee -a "$DEBUG_LOG"
     echo "--- resolvectl domain $VPN_IFACE ---" | tee -a "$DEBUG_LOG"
     resolvectl domain "$VPN_IFACE" | tee -a "$DEBUG_LOG"
+    echo "--- resolvectl query comune.spoleto.pg.it ---" | tee -a "$DEBUG_LOG"
+    resolvectl query comune.spoleto.pg.it 2>&1 | tee -a "$DEBUG_LOG"
+    if [ -f "$DNS_EXTRA_DOMAINS_FILE" ]; then
+        echo "--- dnsdomain-extra ---" | tee -a "$DEBUG_LOG"
+        cat "$DNS_EXTRA_DOMAINS_FILE" | tee -a "$DEBUG_LOG"
+    fi
     echo "--- journalctl (systemd-resolved, last 200) ---" | tee -a "$DEBUG_LOG"
     sudo journalctl -u systemd-resolved -n 200 | tee -a "$DEBUG_LOG"
     echo "--- summary ---" | tee -a "$DEBUG_LOG"
@@ -349,6 +416,14 @@ debug_vpn() {
         VPN_DOMAINS=$(resolvectl domain "$VPN_IFACE" 2>/dev/null | sed -E 's/^[^:]*: ?//')
         DEF_IFACE=$(default_iface)
         DEF_DOMAINS=$(resolvectl domain "$DEF_IFACE" 2>/dev/null | sed -E 's/^[^:]*: ?//')
+        DNS_DOMAIN=""
+        if [ -f "$DNS_DOMAIN_FILE" ]; then
+            DNS_DOMAIN=$(cat "$DNS_DOMAIN_FILE")
+        fi
+        EXTRA_DOMAINS=""
+        if [ -f "$DNS_EXTRA_DOMAINS_FILE" ]; then
+            EXTRA_DOMAINS=$(cat "$DNS_EXTRA_DOMAINS_FILE")
+        fi
         echo "vpn: UP" | tee -a "$DEBUG_LOG"
         echo "vpn_iface: $VPN_IFACE" | tee -a "$DEBUG_LOG"
         echo "vpn_ip: ${VPN_IP:-n/a}" | tee -a "$DEBUG_LOG"
@@ -356,11 +431,62 @@ debug_vpn() {
         echo "vpn_domains: ${VPN_DOMAINS:-n/a}" | tee -a "$DEBUG_LOG"
         echo "default_iface: ${DEF_IFACE:-n/a}" | tee -a "$DEBUG_LOG"
         echo "default_domains: ${DEF_DOMAINS:-n/a}" | tee -a "$DEBUG_LOG"
+        verify_routing_domains "$VPN_IFACE" "$DNS_DOMAIN" "$EXTRA_DOMAINS" | tee -a "$DEBUG_LOG"
     else
         echo "vpn: DOWN" | tee -a "$DEBUG_LOG"
     fi
     echo "resolv.conf mode: ${RESOLVCONF_MODE:-n/a}" | tee -a "$DEBUG_LOG"
     echo "Log salvato in $DEBUG_LOG"
+}
+
+reload_dns() {
+    check_resolved
+    if ! vpn_is_up; then
+        echo "VPN non attiva."
+        return 1
+    fi
+    if [ -f "$DNS_FILE" ]; then
+        DNS_SERVERS=$(cat "$DNS_FILE")
+        if [ -z "$DNS_SERVERS" ]; then
+            echo "Errore: lista DNS vuota in $DNS_FILE"
+            return 1
+        fi
+    else
+        echo "Nessun file DNS trovato ($DNS_FILE)"
+        return 1
+    fi
+
+    if [ -f "$DNS_DOMAIN_FILE" ]; then
+        DNS_DOMAIN=$(cat "$DNS_DOMAIN_FILE")
+        if [ -z "$DNS_DOMAIN" ]; then
+            echo "Errore: default domain vuoto in $DNS_DOMAIN_FILE"
+            return 1
+        fi
+    else
+        echo "Nessun file Default domain trovato ($DNS_DOMAIN_FILE)"
+        return 1
+    fi
+
+    DNS_EXTRA_DOMAINS=""
+    if [ -f "$DNS_EXTRA_DOMAINS_FILE" ]; then
+        DNS_EXTRA_DOMAINS=$(cat "$DNS_EXTRA_DOMAINS_FILE")
+    fi
+
+    VPN_IFACE=$(detect_ppp_iface)
+    if ! wait_resolved_link "$VPN_IFACE"; then
+        echo "Attenzione: systemd-resolved non ha ancora registrato $VPN_IFACE"
+    fi
+    if ! apply_dns_settings "$VPN_IFACE" "$DNS_SERVERS" "$DNS_DOMAIN" "$DNS_EXTRA_DOMAINS"; then
+        echo "Attenzione: impossibile applicare i DNS su $VPN_IFACE"
+        return 1
+    fi
+    apply_search_domain_to_default_iface "$DNS_DOMAIN"
+    if [ -n "$DNS_EXTRA_DOMAINS" ]; then
+        echo "Domini extra applicati su $VPN_IFACE (routing): $DNS_EXTRA_DOMAINS"
+    fi
+    verify_routing_domains "$VPN_IFACE" "$DNS_DOMAIN" "$DNS_EXTRA_DOMAINS"
+    echo "DNS ricaricati su $VPN_IFACE"
+    return 0
 }
 
 # ---------- Main ----------
@@ -373,8 +499,9 @@ case "$1" in
     stop) stop_vpn ;;
     status) status_vpn ;;
     debug) debug_vpn ;;
+    reload-dns) reload_dns ;;
     *)
-        echo "Uso: $0 {start|stop|status|debug}"
+        echo "Uso: $0 {start|stop|status|debug|reload-dns}"
         exit 1
         ;;
 esac
